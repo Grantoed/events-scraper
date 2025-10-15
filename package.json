@@ -2,10 +2,12 @@
   "dependencies": {
     "axios": "^1.12.2",
     "cheerio": "^1.1.2",
+    "dotenv": "^17.2.3",
     "googleapis": "^162.0.0"
   },
   "devDependencies": {
     "@types/cheerio": "^0.22.35",
+    "@types/dotenv": "^6.1.1",
     "@types/node": "^24.7.2",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"

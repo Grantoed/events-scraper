@@ -1,88 +1,78 @@
 import axios from "axios";
 import * as cheerio from "cheerio";
 import { DOU_URL } from "../constants/contants";
-
-interface EventItem {
-  name: string;
-  url: string;
-  date: string;
-  location: string;
-  price: string;
-  description: string;
-  type: string;
-}
+import { EventItem } from "../types/types";
 
 // === SCRAPE EVENTS FROM DOU ===
 async function scrapeEvents(): Promise<EventItem[]> {
-  const { data } = await axios.get(DOU_URL, {
-    headers: { "User-Agent": "Mozilla/5.0" },
-  });
-
-  const $ = cheerio.load(data);
   const events: EventItem[] = [];
+  let page = 1;
+  let hasMore = true;
 
-  let currentDate = "";
+  while (hasMore) {
+    const url = page === 1 ? DOU_URL : `${DOU_URL}${page}/`;
 
-  $(".info, .b-postcard").each((_, el) => {
-    const element = $(el);
-
-    // Date header (like "15 жовтня")
-    if (element.hasClass("info")) {
-      const dateText = element.find("a.date").text().trim();
-      if (dateText) currentDate = dateText;
-      return;
+    let data: string;
+    try {
+      const response = await axios.get(url, {
+        headers: { "User-Agent": "Mozilla/5.0" },
+      });
+      data = response.data;
+    } catch (err: any) {
+      if (err.response?.status === 404) {
+        hasMore = false; // Stop scraping if page does not exist
+        break;
+      } else {
+        throw err; // rethrow other errors
+      }
     }
 
-    // Event card
-    if (element.hasClass("b-postcard")) {
-      const titleEl = element.find("h2.title a");
-      const name = titleEl.text().trim();
-      const url = titleEl.attr("href")?.trim() || "";
+    const $ = cheerio.load(data);
+    let currentDate = "";
 
-      const rawDetails = element.find(".when-and-where").text().trim();
-      const description = element.find("p.b-typo").text().trim();
-      const type = element
-        .find(".more a")
-        .map((_, a) => $(a).text().trim())
-        .get()
-        .join(", ");
+    $(".info, .b-postcard").each((_, el) => {
+      const element = $(el);
 
-      // Clean up details block
-      const details = rawDetails
-        .split("\n")
-        .map((l) => l.trim())
-        .filter((l) => l !== "")
-        .map((l) => l.replace(/\s+/g, " "))
-        .filter(Boolean);
-
-      let date = currentDate;
-      let location = "";
-      let price = "";
-
-      // Usually the structure is:
-      // [ "15 жовтня", "Online", "Безплатно" ]
-      if (details.length === 3) {
-        [, location, price] = details;
-      } else if (details.length === 2) {
-        [, location] = details;
-      } else if (details.length === 1) {
-        location = details[0];
+      if (element.hasClass("info")) {
+        const dateText = element.find("a.date").text().trim();
+        if (dateText) currentDate = dateText;
+        return;
       }
 
-      // Remove any extra parentheses or notes from price if needed
-      price = price.replace(/\s*\(.*?\)\s*/g, "").trim();
+      if (element.hasClass("b-postcard")) {
+        const titleEl = element.find("h2.title a");
+        const name = titleEl.text().trim();
+        const url = titleEl.attr("href")?.trim() || "";
 
-      events.push({
-        name,
-        url,
-        date,
-        location,
-        price,
-        description,
-        type,
-      });
-    }
-  });
+        const rawDetails = element.find(".when-and-where").text().trim();
+        const description = element.find("p.b-typo").text().trim();
+        const type = element
+          .find(".more a")
+          .map((_, a) => $(a).text().trim())
+          .get()
+          .join(", ");
+
+        const details = rawDetails
+          .split("\n")
+          .map((l) => l.trim())
+          .filter(Boolean);
+
+        let date = currentDate;
+        let location = "";
+        let price = "";
+
+        if (details.length === 3) [, location, price] = details;
+        else if (details.length === 2) [, location] = details;
+        else if (details.length === 1) location = details[0];
+
+        price = price.replace(/\s*\(.*?\)\s*/g, "").trim();
+
+        events.push({ name, url, date, location, price, description, type });
+      }
+    });
+
+    page++;
+  }
 
   return events;
 }

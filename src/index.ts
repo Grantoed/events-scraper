@@ -1,5 +1,5 @@
 import scrapeEvents from "./utils/scrape-events.util";
-import writeToSheet from "./utils/write-to-sheet.util";
+import writeToSheet from "./utils/write-events-to-sheets.util";
 
 // === MAIN ===
 (async () => {
